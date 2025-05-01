@@ -1,0 +1,5 @@
+python-dotenv==1.0.0
+requests==2.31.0
+pycryptodome==3.19.0
+click==8.1.7
+netifaces==0.11.0   
