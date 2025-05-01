@@ -178,8 +178,21 @@ class DHTNode:
         """Connect to bootstrap nodes."""
         for node in self.bootstrap_nodes:
             try:
-                host, port = node.split(':')
-                self._send_message((host, int(port)), {
+                # Split the address and handle potential errors
+                parts = node.split(':')
+                if len(parts) != 2:
+                    print(f"Invalid bootstrap node format: {node}. Expected format: IP:PORT")
+                    continue
+                
+                host, port = parts
+                try:
+                    port = int(port)
+                except ValueError:
+                    print(f"Invalid port number in bootstrap node: {node}")
+                    continue
+                
+                print(f"Attempting to bootstrap with node {host}:{port}")
+                self._send_message((host, port), {
                     'type': 'join',
                     'node_id': self.id,
                     'host': self.public_ip,
