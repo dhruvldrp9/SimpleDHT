@@ -11,6 +11,7 @@ A Python-based Distributed Hash Table implementation that allows nodes to connec
 - Simple CLI interface
 - Public IP detection
 - Local network support
+- Python library interface for programmatic use
 
 ## Installation
 
@@ -40,6 +41,36 @@ pip install -e .
 ```
 
 ## Usage
+
+### As a Python Library
+
+The package can be used programmatically in your Python code:
+
+```python
+from simpledht import DHTNode
+
+# Create and start a node
+node = DHTNode(host='0.0.0.0', port=5000)
+node.start()
+
+# Store data
+node.put('mykey', 'myvalue')
+
+# Retrieve data
+value = node.get('mykey')
+
+# Connect to another node
+node.bootstrap('other_node_ip:5000')
+
+# Stop the node when done
+node.stop()
+```
+
+See the `examples/` directory for more detailed usage examples:
+- `basic_usage.py`: Simple example of creating and connecting nodes
+- `distributed_storage.py`: Advanced example showing distributed storage with multiple nodes
+
+### Command Line Interface
 
 ### Starting a Node
 
