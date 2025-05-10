@@ -20,7 +20,7 @@ Example usage:
     node.bootstrap('other_node_ip:5000')
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.4"
 
 from .dht_node import DHTNode
 from .cli import main as cli_main

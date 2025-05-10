@@ -128,6 +128,24 @@ class DHTNode:
             # Update our routing table with the received nodes
             received_table = message.get('routing_table', {})
             self.routing_table.update(received_table)
+        elif msg_type == 'sync_request':
+            # Send our data to the requesting node
+            self._send_response(addr, {
+                'type': 'sync_response',
+                'data': self.data
+            })
+        elif msg_type == 'sync_response':
+            # Update our data with the received data
+            received_data = message.get('data', {})
+            self.data.update(received_data)
+        elif msg_type == 'info_request':
+            # Send information about this node
+            self._send_response(addr, {
+                'type': 'info_response',
+                'node_id': self.id,
+                'peer_count': len(self.routing_table) - 1,  # Exclude self
+                'data_count': len(self.data)
+            })
 
     def _replicate_data(self, key: str, value: str):
         """Replicate data to other nodes in the network."""
@@ -164,11 +182,31 @@ class DHTNode:
             'value': None
         })
 
-    def _send_message_with_response(self, addr: Tuple[str, int], message: dict) -> dict:
-        """Send a message and wait for response."""
+    def _send_message_with_response(self, addr: Tuple[str, int], message: dict, timeout: int = 5) -> dict:
+        """Send a message and wait for response.
+        
+        Args:
+            addr: The address to send the message to
+            message: The message to send
+            timeout: The timeout in seconds
+            
+        Returns:
+            The response message
+        """
         self._send_message(addr, message)
-        data, _ = self.socket.recvfrom(4096)
-        return json.loads(data.decode())
+        
+        # Set timeout for receiving response
+        self.socket.settimeout(timeout)
+        try:
+            data, _ = self.socket.recvfrom(4096)
+            # Reset timeout to None (blocking mode)
+            self.socket.settimeout(None)
+            return json.loads(data.decode())
+        except socket.timeout:
+            raise
+        finally:
+            # Make sure we reset the timeout even if an exception occurs
+            self.socket.settimeout(None)
 
     def _send_response(self, addr: Tuple[str, int], response: dict):
         """Send a response to a node."""
@@ -208,4 +246,131 @@ class DHTNode:
     def stop(self):
         """Stop the DHT node."""
         self.running = False
-        self.socket.close() 
+        self.socket.close()
+        
+    def put(self, key: str, value: str) -> bool:
+        """Store a key-value pair in the DHT.
+        
+        Args:
+            key: The key to store
+            value: The value to store
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Store locally
+        self.data[key] = value
+        
+        # Replicate to other nodes
+        self._replicate_data(key, value)
+        
+        return True
+        
+    def get(self, key: str) -> Optional[str]:
+        """Retrieve a value from the DHT.
+        
+        Args:
+            key: The key to retrieve
+            
+        Returns:
+            The value if found, None otherwise
+        """
+        # Check if we have it locally
+        if key in self.data:
+            return self.data[key]
+            
+        # If not, ask other nodes
+        for node_id, (host, port) in self.routing_table.items():
+            if node_id != self.id:  # Don't ask self
+                try:
+                    response = self._send_message_with_response((host, port), {
+                        'type': 'get',
+                        'key': key
+                    })
+                    
+                    if response.get('type') == 'get_response' and response.get('value') is not None:
+                        return response.get('value')
+                except Exception as e:
+                    print(f"Failed to get value from {host}:{port}: {e}")
+                    
+        # Not found anywhere
+        return None
+        
+    def bootstrap(self, node_address: str):
+        """Connect to another node to join the network.
+        
+        Args:
+            node_address: The address of the node to connect to in the format 'host:port'
+            
+        Returns:
+            bool: True if successfully connected, False otherwise
+        """
+        try:
+            parts = node_address.split(':')
+            if len(parts) != 2:
+                print(f"Invalid bootstrap node format: {node_address}. Expected format: IP:PORT")
+                return False
+                
+            host, port = parts
+            try:
+                port = int(port)
+            except ValueError:
+                print(f"Invalid port number in bootstrap node: {node_address}")
+                return False
+                
+            print(f"Bootstrapping with node {host}:{port}")
+            
+            # Try multiple times in case of network issues
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    response = self._send_message_with_response((host, port), {
+                        'type': 'join',
+                        'node_id': self.id,
+                        'host': self.public_ip,
+                        'port': self.port
+                    }, timeout=5)
+                    
+                    if response.get('type') == 'join_ack':
+                        received_table = response.get('routing_table', {})
+                        self.routing_table.update(received_table)
+                        print(f"Successfully connected to {host}:{port}")
+                        
+                        # Sync data with the network
+                        self._sync_data_with_network()
+                        return True
+                    break
+                except socket.timeout:
+                    print(f"Connection attempt {attempt+1}/{max_attempts} timed out, retrying...")
+                    if attempt == max_attempts - 1:
+                        print(f"Failed to connect to {host}:{port} after {max_attempts} attempts")
+                        return False
+                except Exception as e:
+                    print(f"Error during connection attempt {attempt+1}: {e}")
+                    break
+        except Exception as e:
+            print(f"Failed to bootstrap with {node_address}: {e}")
+            
+        return False
+        
+    def _sync_data_with_network(self):
+        """Sync data with other nodes in the network after joining."""
+        if not self.routing_table:
+            return
+            
+        # Request data from a random node in the routing table
+        for node_id, (host, port) in self.routing_table.items():
+            if node_id != self.id:  # Don't ask self
+                try:
+                    response = self._send_message_with_response((host, port), {
+                        'type': 'sync_request'
+                    })
+                    
+                    if response.get('type') == 'sync_response':
+                        # Update our data with the received data
+                        received_data = response.get('data', {})
+                        self.data.update(received_data)
+                        print(f"Synced {len(received_data)} key-value pairs from the network")
+                        return
+                except Exception as e:
+                    print(f"Failed to sync data from {host}:{port}: {e}") 

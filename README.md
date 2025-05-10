@@ -8,6 +8,8 @@ A Python-based Distributed Hash Table implementation that allows nodes to connec
 - Key-value storage and retrieval
 - Automatic node discovery
 - Data replication between nodes
+- Data synchronization when joining the network
+- Reliable bootstrapping with retry mechanism
 - Simple CLI interface
 - Public IP detection
 - Local network support
@@ -25,7 +27,7 @@ pip install simpledht
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/dhruvldrp9/SimpleDHT
 cd SimpleDHT
 ```
 
@@ -72,51 +74,53 @@ See the `examples/` directory for more detailed usage examples:
 
 ### Command Line Interface
 
-### Starting a Node
+#### Starting a Node
 
 To start a new DHT node:
+
 ```bash
-python cli.py start --host 0.0.0.0 --port 5000
+python -m simpledht.cli start --host 0.0.0.0 --port 5000
 ```
 
 To start a node and connect to existing nodes:
+
 ```bash
-python cli.py start --host 0.0.0.0 --port 5001 --bootstrap "PUBLIC_IP:5000"
+python -m simpledht.cli start --host 0.0.0.0 --port 5001 --bootstrap "PUBLIC_IP:5000"
 ```
 
-### Storing Data
+#### Storing Data
 
 To store a key-value pair:
+
 ```bash
-python cli.py put --host PUBLIC_IP --port 5000 mykey "my value"
+python -m simpledht.cli put --host PUBLIC_IP --port 5000 mykey "my value"
 ```
 
-### Retrieving Data
+#### Retrieving Data
 
-To retrieve a value:
 ```bash
-python cli.py get --host PUBLIC_IP --port 5000 mykey
+python -m simpledht.cli get --host PUBLIC_IP --port 5000 mykey
 ```
 
 ### Cross-Network Example
 
 1. Start Node 1 (First network):
 ```bash
-python cli.py start --host 0.0.0.0 --port 5000
+python -m simpledht.cli start --host 0.0.0.0 --port 5000
 ```
 
 2. Start Node 2 (Second network):
 ```bash
-python cli.py start --host 0.0.0.0 --port 5000 --bootstrap "NODE1_PUBLIC_IP:5000"
+python -m simpledht.cli start --host 0.0.0.0 --port 5000 --bootstrap "NODE1_PUBLIC_IP:5000"
 ```
 
 3. Store and retrieve data:
 ```bash
 # Store on Node 1
-python cli.py put --host NODE1_PUBLIC_IP --port 5000 test_key "test_value"
+python -m simpledht.cli put --host NODE1_PUBLIC_IP --port 5000 test_key "test_value"
 
 # Retrieve from Node 2
-python cli.py get --host NODE2_PUBLIC_IP --port 5000 test_key
+python -m simpledht.cli get --host NODE2_PUBLIC_IP --port 5000 test_key
 ```
 
 ## Network Configuration
@@ -139,6 +143,14 @@ If your node is behind a NAT router:
 1. Access your router's admin interface
 2. Set up port forwarding for UDP port 5000
 3. Forward to your node's local IP address
+
+## New Features in Version 0.1.3
+
+- **Improved Bootstrap Mechanism**: Added retry logic for more reliable connections across networks
+- **Data Synchronization**: Nodes automatically sync data when joining the network
+- **Enhanced Error Handling**: Better handling of network timeouts and connection issues
+- **Full Data Replication**: All nodes maintain a complete copy of the data for redundancy
+- **Alternative Command Method**: Added support for running via `python -m simpledht.cli`
 
 ## Troubleshooting
 
@@ -166,6 +178,8 @@ If your node is behind a NAT router:
 - `No response received`: Node is not responding
 - `Address already in use`: Port conflict
 - `Failed to get public IP`: Network connectivity issue
+- `Connection attempt X/3 timed out, retrying...`: Network latency or connectivity issues
+- `simpledht: command not found`: The command-line tool is not in your PATH. Use the Python module directly: `python -m simpledht.cli`
 
 ## Architecture
 
@@ -175,6 +189,7 @@ The DHT implementation uses:
 - Automatic public IP detection
 - Data replication between nodes
 - Bootstrap nodes for network discovery
+- Retry mechanism for reliable connections
 
 ## Security Considerations
 

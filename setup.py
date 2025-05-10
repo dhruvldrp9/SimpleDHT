@@ -5,11 +5,11 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="simpledht",
-    version="0.1.1",
+    version="0.1.4",
     author="Dhruvkumar Patel",
     author_email="dhruv.ldrp9@gmail.com",
     description="A simple distributed hash table implementation",
-    long_description="A simple distributed hash table implementation",
+    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/dhruvldrp9/simpledht",
     packages=find_packages(),
